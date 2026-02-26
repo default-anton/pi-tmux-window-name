@@ -18,12 +18,13 @@ Rules:
 - Keep both names specific to the user's task.
 - Use plain letters and numbers only.
 - Use spaces between words. No punctuation.
+- Use sentence case (capitalize only the first word unless a word is already mixed-case or all caps).
 - No quotes, markdown, emojis, labels beyond WINDOW:/SESSION:, or explanations.
 - The session name should be descriptive enough for quickly scanning a session list.
 
 Examples:
-WINDOW: Fix OAuth Callback Logic
-SESSION: Implement OAuth Callback Validation And Retry Flow In Auth Service`;
+WINDOW: Fix OAuth callback logic
+SESSION: Implement OAuth callback validation and retry flow in auth service`;
 
 type GeneratedNames = {
   windowName: string;
@@ -41,15 +42,8 @@ function normalizeWords(value: string): string[] {
     .filter(Boolean);
 }
 
-function toTitle(word: string): string {
-  if (word.length <= 1) return word.toUpperCase();
-  const hasUppercase = /[A-Z]/.test(word.slice(1));
-  if (hasUppercase) return word;
-  return word[0].toUpperCase() + word.slice(1).toLowerCase();
-}
-
 function compactWindowName(value: string, minWords = WINDOW_WORD_MIN): string | undefined {
-  const words = normalizeWords(value).slice(0, WINDOW_WORD_MAX).map(toTitle);
+  const words = normalizeWords(value).slice(0, WINDOW_WORD_MAX);
   if (words.length < minWords) return undefined;
 
   const name = words.join(" ").trim();
@@ -57,7 +51,7 @@ function compactWindowName(value: string, minWords = WINDOW_WORD_MIN): string | 
 }
 
 function compactSessionName(value: string, minWords = SESSION_WORD_MIN): string | undefined {
-  const words = normalizeWords(value).slice(0, SESSION_WORD_MAX).map(toTitle);
+  const words = normalizeWords(value).slice(0, SESSION_WORD_MAX);
   if (words.length < minWords) return undefined;
 
   while (words.length > minWords && words.join(" ").length > SESSION_CHAR_MAX) {
