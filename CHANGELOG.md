@@ -17,7 +17,10 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 ### Changed
 
-- None.
+- Switched tmux window naming from a 24-character cap to 3–4 word titles.
+- Added separate longer 8–12 word session names for better `/resume` list scanning.
+- Persisted short tmux titles in custom session entries so resumes restore concise window names even with long session titles.
+- Removed fallback naming; on generation errors or invalid model output, existing names are preserved unchanged.
 
 ### Fixed
 

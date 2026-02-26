@@ -1,6 +1,6 @@
 # pi-tmux-window-name
 
-Auto-name tmux windows for [pi](https://github.com/badlogic/pi-mono) coding sessions.
+Auto-name tmux windows and session titles for [pi](https://github.com/badlogic/pi-mono) coding sessions.
 
 ## Installation
 
@@ -27,16 +27,18 @@ pi -e git:github.com/default-anton/pi-tmux-window-name
 ## What it does
 
 - Watches session lifecycle and the first user prompt.
-- Generates a short 1–2 word title from the prompt.
-- Persists the generated session name with `pi.setSessionName(...)`.
+- Generates two names from the prompt:
+  - **tmux window title**: concise 3–4 words.
+  - **pi session name**: longer 8–12 word summary for `/resume` scanning.
+- Persists the session name with `pi.setSessionName(...)`.
+- Persists the short tmux title in a custom session entry for reliable restore.
 - Renames the current tmux window (when running inside tmux).
-- Keeps final names capped at 24 characters.
-- Falls back to deterministic local naming when model or API key is unavailable.
+- If generation fails or output is invalid, leaves session/tmux names unchanged.
 
 ## Extension behavior
 
 - Names are generated once per session, then reused when switching/resuming sessions.
-- Existing session names are restored to tmux window names on `session_start` and `session_switch`.
+- On `session_start` / `session_switch`, tmux restore prefers the stored short title and falls back to a compacted session name.
 - Name normalization strips punctuation and keeps alphanumeric words.
 
 ## Development
