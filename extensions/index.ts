@@ -6,6 +6,7 @@ const WINDOW_WORD_MAX = 4;
 const SESSION_WORD_MIN = 8;
 const SESSION_WORD_MAX = 12;
 const SESSION_CHAR_MAX = 96;
+const REQUEST_TIMEOUT_MS = 30_000;
 const WINDOW_NAME_ENTRY_TYPE = "pi-tmux-window-name/window";
 
 const WINDOW_AND_SESSION_PROMPT = `You generate names for coding sessions.
@@ -78,13 +79,22 @@ function parseGeneratedNames(value: string): { window?: string; session?: string
   let sessionName: string | undefined;
 
   for (const line of lines) {
-    if (!windowName && /^window\s*:/i.test(line)) {
-      windowName = cleanGeneratedValue(line.replace(/^window\s*:/i, ""));
-      continue;
+    if (!windowName) {
+      const windowMatch = line.match(/window\s*:\s*(.*?)(?=\bsession\s*:|$)/i);
+      if (windowMatch?.[1]) {
+        windowName = cleanGeneratedValue(windowMatch[1]);
+      }
     }
 
-    if (!sessionName && /^session\s*:/i.test(line)) {
-      sessionName = cleanGeneratedValue(line.replace(/^session\s*:/i, ""));
+    if (!sessionName) {
+      const sessionMatch = line.match(/session\s*:\s*(.*)$/i);
+      if (sessionMatch?.[1]) {
+        sessionName = cleanGeneratedValue(sessionMatch[1]);
+      }
+    }
+
+    if (windowName && sessionName) {
+      break;
     }
   }
 
@@ -140,6 +150,12 @@ function getFirstUserPrompt(entries: SessionEntry[]): string | undefined {
   return undefined;
 }
 
+function formatUserPrompt(seed: string): string {
+  const task = seed.slice(0, 4000);
+
+  return `<user_message>\n${task}\n</user_message>\n\nRespond now using exactly this format:\nWINDOW: 3-4 words\nSESSION: 8-12 words`;
+}
+
 async function renameCurrentTmuxWindow(pi: ExtensionAPI, name: string): Promise<boolean> {
   if (!process.env.TMUX) return false;
 
@@ -164,12 +180,12 @@ async function generateNames(prompt: string, ctx: ExtensionContext): Promise<Gen
 
   const message: UserMessage = {
     role: "user",
-    content: [{ type: "text", text: seed.slice(0, 4000) }],
+    content: [{ type: "text", text: formatUserPrompt(seed) }],
     timestamp: Date.now(),
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   const response = await completeSimple(
     ctx.model,
@@ -179,7 +195,7 @@ async function generateNames(prompt: string, ctx: ExtensionContext): Promise<Gen
     },
     {
       apiKey,
-      reasoning: "low",
+      reasoning: "none",
       maxTokens: 96,
       signal: controller.signal,
     },
@@ -280,8 +296,14 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     await restoreExistingSessionName(ctx);
   });
 
-  pi.on("before_agent_start", (event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     const firstPrompt = getFirstUserPrompt(ctx.sessionManager.getBranch()) ?? event.prompt;
-    void applyName(firstPrompt, ctx);
+
+    if (ctx.hasUI) {
+      void applyName(firstPrompt, ctx);
+      return;
+    }
+
+    await applyName(firstPrompt, ctx);
   });
 }
