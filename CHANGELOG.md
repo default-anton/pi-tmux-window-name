@@ -21,6 +21,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 ### Fixed
 
+- None.
+
+## [0.2.2] - 2026-02-26
+
+### Added
+
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
 - Fixed name generation for OpenAI reasoning models by switching naming requests to `reasoning: "none"` so text output is returned and parsed.
 - Ensured tmux/session naming completes in non-interactive runs (`pi -p`) by awaiting naming in `before_agent_start` when `ctx.hasUI` is false.
 
