@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.2.1] - 2026-02-25
+
+### Added
+
+- None.
+
+### Changed
+
+- Updated naming prompt/examples to request sentence case output (for example, `Logical commit push`).
+
+### Fixed
+
+- Removed JS title-case normalization so generated window/session casing is preserved as returned by the model.
+
 ## [0.2.0] - 2026-02-25
 
 ### Added
