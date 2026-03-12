@@ -1,5 +1,10 @@
 import { completeSimple, type UserMessage } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+  SessionEntry,
+} from "@mariozechner/pi-coding-agent";
 
 const WINDOW_WORD_MIN = 3;
 const WINDOW_WORD_MAX = 4;
@@ -7,7 +12,32 @@ const SESSION_WORD_MIN = 8;
 const SESSION_WORD_MAX = 12;
 const SESSION_CHAR_MAX = 96;
 const REQUEST_TIMEOUT_MS = 30_000;
+const NAMING_SOURCE_CHAR_MAX = 4000;
 const WINDOW_NAME_ENTRY_TYPE = "pi-tmux-window-name/window";
+
+type NamingSource = "user_message" | "conversation";
+type RenameFailureReason =
+  | "missing_prompt"
+  | "missing_model"
+  | "missing_api_key"
+  | "request_failed"
+  | "invalid_output"
+  | "skipped"
+  | "stale_session";
+
+type GenerateNamesResult =
+  | { ok: true; names: GeneratedNames }
+  | {
+      ok: false;
+      reason: Exclude<RenameFailureReason, "skipped" | "stale_session">;
+    };
+
+type RenameResult =
+  | { ok: true; names: GeneratedNames }
+  | {
+      ok: false;
+      reason: RenameFailureReason;
+    };
 
 const WINDOW_AND_SESSION_PROMPT = `You generate names for coding sessions.
 
@@ -118,7 +148,7 @@ function getStoredWindowName(entries: SessionEntry[]): string | undefined {
   return undefined;
 }
 
-function extractTextFromUserContent(content: unknown): string {
+function extractTextFromMessageContent(content: unknown): string {
   if (typeof content === "string") {
     return content.trim();
   }
@@ -143,17 +173,37 @@ function getFirstUserPrompt(entries: SessionEntry[]): string | undefined {
     if (entry.type !== "message") continue;
     if (entry.message.role !== "user") continue;
 
-    const text = extractTextFromUserContent(entry.message.content);
+    const text = extractTextFromMessageContent(entry.message.content);
     if (text) return text;
   }
 
   return undefined;
 }
 
-function formatUserPrompt(seed: string): string {
-  const task = seed.slice(0, 4000);
+function buildConversationNamingSource(entries: SessionEntry[]): string | undefined {
+  const messages: string[] = [];
 
-  return `<user_message>\n${task}\n</user_message>\n\nRespond now using exactly this format:\nWINDOW: 3-4 words\nSESSION: 8-12 words`;
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+
+    const role = entry.message.role;
+    if (role !== "user" && role !== "assistant") continue;
+
+    const text = extractTextFromMessageContent(entry.message.content);
+    if (!text) continue;
+
+    messages.push(`<${role}>\n${text}\n</${role}>`);
+  }
+
+  const conversation = messages.join("\n\n").trim();
+  return conversation || undefined;
+}
+
+function formatNamingPrompt(seed: string, source: NamingSource): string {
+  const tag = source === "conversation" ? "conversation" : "user_message";
+  const content = seed.trim().slice(0, NAMING_SOURCE_CHAR_MAX);
+
+  return `<${tag}>\n${content}\n</${tag}>\n\nRespond now using exactly this format:\nWINDOW: 3-4 words\nSESSION: 8-12 words`;
 }
 
 async function renameCurrentTmuxWindow(pi: ExtensionAPI, name: string): Promise<boolean> {
@@ -167,41 +217,54 @@ async function renameCurrentTmuxWindow(pi: ExtensionAPI, name: string): Promise<
   }
 }
 
-async function generateNames(prompt: string, ctx: ExtensionContext): Promise<GeneratedNames | undefined> {
+async function generateNames(
+  prompt: string,
+  source: NamingSource,
+  ctx: ExtensionContext,
+): Promise<GenerateNamesResult> {
   const seed = prompt.trim();
-  if (!seed || !ctx.model) {
-    return undefined;
+  if (!seed) {
+    return { ok: false, reason: "missing_prompt" };
+  }
+
+  if (!ctx.model) {
+    return { ok: false, reason: "missing_model" };
   }
 
   const apiKey = await ctx.modelRegistry.getApiKey(ctx.model);
   if (!apiKey) {
-    return undefined;
+    return { ok: false, reason: "missing_api_key" };
   }
 
   const message: UserMessage = {
     role: "user",
-    content: [{ type: "text", text: formatUserPrompt(seed) }],
+    content: [{ type: "text", text: formatNamingPrompt(seed, source) }],
     timestamp: Date.now(),
   };
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const response = await completeSimple(
-    ctx.model,
-    {
-      systemPrompt: WINDOW_AND_SESSION_PROMPT,
-      messages: [message],
-    },
-    {
-      apiKey,
-      reasoning: "none",
-      maxTokens: 96,
-      signal: controller.signal,
-    },
-  ).finally(() => {
+  let response;
+  try {
+    response = await completeSimple(
+      ctx.model,
+      {
+        systemPrompt: WINDOW_AND_SESSION_PROMPT,
+        messages: [message],
+      },
+      {
+        apiKey,
+        reasoning: "none",
+        maxTokens: 96,
+        signal: controller.signal,
+      },
+    );
+  } catch {
+    return { ok: false, reason: "request_failed" };
+  } finally {
     clearTimeout(timeoutId);
-  });
+  }
 
   const generated = response.content
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
@@ -213,16 +276,40 @@ async function generateNames(prompt: string, ctx: ExtensionContext): Promise<Gen
   const sessionName = compactSessionName(parsed.session ?? "");
 
   if (!windowName || !sessionName) {
-    return undefined;
+    return { ok: false, reason: "invalid_output" };
   }
 
-  return { windowName, sessionName };
+  return { ok: true, names: { windowName, sessionName } };
+}
+
+function describeRenameFailure(reason: RenameFailureReason): string {
+  switch (reason) {
+    case "missing_prompt":
+      return "No user or assistant text found in the current branch.";
+    case "missing_model":
+      return "No active model is selected for generating a session name.";
+    case "missing_api_key":
+      return "No API key is available for the active model.";
+    case "request_failed":
+      return "Session rename request failed.";
+    case "invalid_output":
+      return "The model returned an invalid session name format.";
+    case "stale_session":
+      return "Session changed before rename completed.";
+    case "skipped":
+      return "Session rename was skipped.";
+  }
+}
+
+function notify(ctx: ExtensionContext | ExtensionCommandContext, message: string, level: "info" | "error") {
+  if (!ctx.hasUI) return;
+  ctx.ui.notify(message, level);
 }
 
 export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
   let hasNameForSession = false;
   let hasAttemptedNameForSession = false;
-  let renameInFlight: Promise<void> | null = null;
+  let renameInFlight: Promise<RenameResult> | null = null;
   let sessionEpoch = 0;
 
   const resetSessionState = () => {
@@ -232,38 +319,48 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     renameInFlight = null;
   };
 
-  const applyName = async (seedPrompt: string | undefined, ctx: ExtensionContext): Promise<void> => {
-    if (hasNameForSession || hasAttemptedNameForSession || renameInFlight) return;
+  const persistNames = async (names: GeneratedNames) => {
+    pi.setSessionName(names.sessionName);
+    pi.appendEntry(WINDOW_NAME_ENTRY_TYPE, { windowName: names.windowName });
+    await renameCurrentTmuxWindow(pi, names.windowName);
+    hasNameForSession = true;
+    hasAttemptedNameForSession = true;
+  };
 
-    const existing = pi.getSessionName();
-    if (existing) {
-      const restoredWindow = getStoredWindowName(ctx.sessionManager.getBranch()) ?? compactWindowName(existing, 1) ?? existing;
-      await renameCurrentTmuxWindow(pi, restoredWindow);
-      hasNameForSession = true;
-      return;
+  const runRename = async (
+    prompt: string | undefined,
+    source: NamingSource,
+    ctx: ExtensionContext,
+    options?: { force?: boolean },
+  ): Promise<RenameResult> => {
+    const force = options?.force ?? false;
+
+    if (!force && (hasNameForSession || hasAttemptedNameForSession || renameInFlight)) {
+      return { ok: false, reason: "skipped" };
     }
 
-    const prompt = seedPrompt?.trim();
-    if (!prompt) return;
+    const seed = prompt?.trim();
+    if (!seed) {
+      return { ok: false, reason: "missing_prompt" };
+    }
 
-    hasAttemptedNameForSession = true;
+    if (!force) {
+      hasAttemptedNameForSession = true;
+    }
+
     const currentEpoch = sessionEpoch;
-    const work = (async () => {
-      let names: GeneratedNames | undefined;
-      try {
-        names = await generateNames(prompt, ctx);
-      } catch {
-        return;
+    const work = (async (): Promise<RenameResult> => {
+      const result = await generateNames(seed, source, ctx);
+      if (!result.ok) {
+        return result;
       }
 
-      if (currentEpoch !== sessionEpoch || !names) return;
-
-      pi.setSessionName(names.sessionName);
-      pi.appendEntry(WINDOW_NAME_ENTRY_TYPE, { windowName: names.windowName });
-      await renameCurrentTmuxWindow(pi, names.windowName);
-      if (currentEpoch === sessionEpoch) {
-        hasNameForSession = true;
+      if (currentEpoch !== sessionEpoch) {
+        return { ok: false, reason: "stale_session" };
       }
+
+      await persistNames(result.names);
+      return { ok: true, names: result.names };
     })();
 
     const inFlight = work.finally(() => {
@@ -273,7 +370,20 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     });
 
     renameInFlight = inFlight;
-    await inFlight;
+    return inFlight;
+  };
+
+  const applyAutoName = async (seedPrompt: string | undefined, ctx: ExtensionContext): Promise<void> => {
+    const existing = pi.getSessionName();
+    if (existing) {
+      const restoredWindow = getStoredWindowName(ctx.sessionManager.getBranch()) ?? compactWindowName(existing, 1) ?? existing;
+      await renameCurrentTmuxWindow(pi, restoredWindow);
+      hasNameForSession = true;
+      hasAttemptedNameForSession = true;
+      return;
+    }
+
+    await runRename(seedPrompt, "user_message", ctx);
   };
 
   const restoreExistingSessionName = async (ctx: ExtensionContext) => {
@@ -284,7 +394,36 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     const windowName = storedWindow ?? compactWindowName(existing, 1) ?? existing;
     await renameCurrentTmuxWindow(pi, windowName);
     hasNameForSession = true;
+    hasAttemptedNameForSession = true;
   };
+
+  const renameFromBranch = async (args: string, ctx: ExtensionCommandContext) => {
+    if (args.trim()) {
+      notify(ctx, "/rename does not take arguments", "error");
+      return;
+    }
+
+    await ctx.waitForIdle();
+
+    if (renameInFlight) {
+      await renameInFlight;
+    }
+
+    const conversation = buildConversationNamingSource(ctx.sessionManager.getBranch());
+    const result = await runRename(conversation, "conversation", ctx, { force: true });
+
+    if (!result.ok) {
+      notify(ctx, describeRenameFailure(result.reason), "error");
+      return;
+    }
+
+    notify(ctx, `Renamed session: ${result.names.sessionName}`, "info");
+  };
+
+  pi.registerCommand("rename", {
+    description: "Rename the current session from user and assistant messages in this branch",
+    handler: renameFromBranch,
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     resetSessionState();
@@ -300,10 +439,10 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     const firstPrompt = getFirstUserPrompt(ctx.sessionManager.getBranch()) ?? event.prompt;
 
     if (ctx.hasUI) {
-      void applyName(firstPrompt, ctx);
+      void applyAutoName(firstPrompt, ctx);
       return;
     }
 
-    await applyName(firstPrompt, ctx);
+    await applyAutoName(firstPrompt, ctx);
   });
 }

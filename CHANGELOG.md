@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.3.0] - 2026-03-11
+
+### Added
+
+- Added `/rename` to recompute tmux/session names from user and assistant message text in the current branch.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- Capped naming input length so auto naming and `/rename` do not send unbounded branch text to the model.
+
 ## [0.2.2] - 2026-02-26
 
 ### Added
