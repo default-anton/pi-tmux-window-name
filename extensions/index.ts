@@ -6,6 +6,7 @@ import type {
   SessionEntry,
 } from "@mariozechner/pi-coding-agent";
 
+import { isTmuxWindowNameExtensionDisabled } from "./disable.ts";
 import { buildRenameWindowArgs, resolveTmuxWindowTarget } from "./tmux-window-target.ts";
 
 const WINDOW_WORD_MIN = 3;
@@ -313,6 +314,10 @@ function notify(ctx: ExtensionContext | ExtensionCommandContext, message: string
 }
 
 export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
+  if (isTmuxWindowNameExtensionDisabled()) {
+    return;
+  }
+
   let hasNameForSession = false;
   let hasAttemptedNameForSession = false;
   let renameInFlight: Promise<RenameResult> | null = null;

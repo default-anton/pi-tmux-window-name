@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { DISABLE_ENV_VAR, isTmuxWindowNameExtensionDisabled } from "../extensions/disable.ts";
 import { buildRenameWindowArgs, resolveTmuxWindowTarget } from "../extensions/tmux-window-target.ts";
 
 test("buildRenameWindowArgs targets a captured window when available", () => {
@@ -41,4 +42,16 @@ test("resolveTmuxWindowTarget returns undefined outside tmux or when tmux fails"
     { TMUX: "/tmp/tmux-1000/default,123,0", TMUX_PANE: "%42" },
   );
   assert.equal(failed, undefined);
+});
+
+test("isTmuxWindowNameExtensionDisabled accepts standard truthy env values", () => {
+  for (const value of ["1", "true", "TRUE", " yes ", "on"]) {
+    assert.equal(isTmuxWindowNameExtensionDisabled({ [DISABLE_ENV_VAR]: value }), true);
+  }
+});
+
+test("isTmuxWindowNameExtensionDisabled ignores empty and falsey-looking env values", () => {
+  for (const value of [undefined, "", "0", "false", "no", "off", "disabled"]) {
+    assert.equal(isTmuxWindowNameExtensionDisabled({ [DISABLE_ENV_VAR]: value }), false);
+  }
 });
