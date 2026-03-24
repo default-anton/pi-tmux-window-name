@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.3.1] - 2026-03-24
+
+### Added
+
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- Captured the tmux window target before async name generation so switching tmux windows mid-request no longer renames the wrong window.
+
 ## [0.3.0] - 2026-03-11
 
 ### Added

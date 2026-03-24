@@ -6,6 +6,8 @@ import type {
   SessionEntry,
 } from "@mariozechner/pi-coding-agent";
 
+import { buildRenameWindowArgs, resolveTmuxWindowTarget } from "./tmux-window-target.ts";
+
 const WINDOW_WORD_MIN = 3;
 const WINDOW_WORD_MAX = 4;
 const SESSION_WORD_MIN = 8;
@@ -206,11 +208,15 @@ function formatNamingPrompt(seed: string, source: NamingSource): string {
   return `<${tag}>\n${content}\n</${tag}>\n\nRespond now using exactly this format:\nWINDOW: 3-4 words\nSESSION: 8-12 words`;
 }
 
-async function renameCurrentTmuxWindow(pi: ExtensionAPI, name: string): Promise<boolean> {
+async function renameCurrentTmuxWindow(
+  pi: ExtensionAPI,
+  name: string,
+  targetWindow?: string,
+): Promise<boolean> {
   if (!process.env.TMUX) return false;
 
   try {
-    const result = await pi.exec("tmux", ["rename-window", name]);
+    const result = await pi.exec("tmux", buildRenameWindowArgs(name, targetWindow));
     return result.code === 0;
   } catch {
     return false;
@@ -311,18 +317,41 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
   let hasAttemptedNameForSession = false;
   let renameInFlight: Promise<RenameResult> | null = null;
   let sessionEpoch = 0;
+  let tmuxWindowTarget: string | undefined;
+  let tmuxWindowTargetInFlight: Promise<string | undefined> | null = null;
 
   const resetSessionState = () => {
     sessionEpoch += 1;
     hasNameForSession = false;
     hasAttemptedNameForSession = false;
     renameInFlight = null;
+    tmuxWindowTarget = undefined;
+    tmuxWindowTargetInFlight = null;
   };
 
-  const persistNames = async (names: GeneratedNames) => {
+  const captureTmuxWindowTarget = async (): Promise<string | undefined> => {
+    if (tmuxWindowTarget) return tmuxWindowTarget;
+    if (tmuxWindowTargetInFlight) return tmuxWindowTargetInFlight;
+
+    const work = resolveTmuxWindowTarget((command, args) => pi.exec(command, args))
+      .then((target) => {
+        tmuxWindowTarget = target;
+        return target;
+      })
+      .finally(() => {
+        if (tmuxWindowTargetInFlight === work) {
+          tmuxWindowTargetInFlight = null;
+        }
+      });
+
+    tmuxWindowTargetInFlight = work;
+    return work;
+  };
+
+  const persistNames = async (names: GeneratedNames, targetWindow?: string) => {
     pi.setSessionName(names.sessionName);
     pi.appendEntry(WINDOW_NAME_ENTRY_TYPE, { windowName: names.windowName });
-    await renameCurrentTmuxWindow(pi, names.windowName);
+    await renameCurrentTmuxWindow(pi, names.windowName, targetWindow);
     hasNameForSession = true;
     hasAttemptedNameForSession = true;
   };
@@ -350,6 +379,7 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
 
     const currentEpoch = sessionEpoch;
     const work = (async (): Promise<RenameResult> => {
+      const targetWindow = await captureTmuxWindowTarget();
       const result = await generateNames(seed, source, ctx);
       if (!result.ok) {
         return result;
@@ -359,7 +389,7 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
         return { ok: false, reason: "stale_session" };
       }
 
-      await persistNames(result.names);
+      await persistNames(result.names, targetWindow);
       return { ok: true, names: result.names };
     })();
 
@@ -374,10 +404,11 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
   };
 
   const applyAutoName = async (seedPrompt: string | undefined, ctx: ExtensionContext): Promise<void> => {
+    const targetWindow = await captureTmuxWindowTarget();
     const existing = pi.getSessionName();
     if (existing) {
       const restoredWindow = getStoredWindowName(ctx.sessionManager.getBranch()) ?? compactWindowName(existing, 1) ?? existing;
-      await renameCurrentTmuxWindow(pi, restoredWindow);
+      await renameCurrentTmuxWindow(pi, restoredWindow, targetWindow);
       hasNameForSession = true;
       hasAttemptedNameForSession = true;
       return;
@@ -390,9 +421,10 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     const existing = pi.getSessionName();
     if (!existing) return;
 
+    const targetWindow = await captureTmuxWindowTarget();
     const storedWindow = getStoredWindowName(ctx.sessionManager.getBranch());
     const windowName = storedWindow ?? compactWindowName(existing, 1) ?? existing;
-    await renameCurrentTmuxWindow(pi, windowName);
+    await renameCurrentTmuxWindow(pi, windowName, targetWindow);
     hasNameForSession = true;
     hasAttemptedNameForSession = true;
   };
