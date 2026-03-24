@@ -13,6 +13,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+## [0.4.0] - 2026-03-24
+
+### Added
+
 - Added `PI_TMUX_WINDOW_NAME_DISABLED=1` to disable tmux/session naming and the `/rename` command, which is useful for sub-agents.
 
 ### Changed
