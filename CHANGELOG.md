@@ -21,6 +21,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 ### Fixed
 
+- None.
+
+## [0.4.1] - 2026-03-24
+
+### Added
+
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
 - Updated the release workflow to `actions/checkout@v6` and `actions/setup-node@v6` so releases no longer rely on the deprecated Node 20 GitHub Actions runtime.
 
 ## [0.4.0] - 2026-03-24
