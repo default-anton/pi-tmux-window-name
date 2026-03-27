@@ -23,6 +23,21 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.4.2] - 2026-03-27
+
+### Added
+
+- None.
+
+### Changed
+
+- Updated `@mariozechner/pi-ai` and `@mariozechner/pi-coding-agent` in peer and dev dependencies to `^0.63.1`.
+- Added a TypeScript `check` script and included it in `release:gate` so future pi SDK/API changes fail fast before publish.
+
+### Fixed
+
+- Updated model-auth lookup to use pi's request-scoped auth API, so naming still works with dynamic model headers in pi `0.63.x`.
+
 ## [0.4.1] - 2026-03-24
 
 ### Added

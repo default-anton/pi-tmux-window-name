@@ -22,7 +22,7 @@ type NamingSource = "user_message" | "conversation";
 type RenameFailureReason =
   | "missing_prompt"
   | "missing_model"
-  | "missing_api_key"
+  | "missing_auth"
   | "request_failed"
   | "invalid_output"
   | "skipped"
@@ -238,9 +238,9 @@ async function generateNames(
     return { ok: false, reason: "missing_model" };
   }
 
-  const apiKey = await ctx.modelRegistry.getApiKey(ctx.model);
-  if (!apiKey) {
-    return { ok: false, reason: "missing_api_key" };
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+  if (!auth.ok) {
+    return { ok: false, reason: "missing_auth" };
   }
 
   const message: UserMessage = {
@@ -261,8 +261,8 @@ async function generateNames(
         messages: [message],
       },
       {
-        apiKey,
-        reasoning: "none",
+        apiKey: auth.apiKey,
+        headers: auth.headers,
         maxTokens: 96,
         signal: controller.signal,
       },
@@ -295,8 +295,8 @@ function describeRenameFailure(reason: RenameFailureReason): string {
       return "No user or assistant text found in the current branch.";
     case "missing_model":
       return "No active model is selected for generating a session name.";
-    case "missing_api_key":
-      return "No API key is available for the active model.";
+    case "missing_auth":
+      return "No request auth is available for the active model.";
     case "request_failed":
       return "Session rename request failed.";
     case "invalid_output":
