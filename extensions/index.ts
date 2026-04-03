@@ -467,11 +467,6 @@ export default function tmuxWindowNameExtension(pi: ExtensionAPI) {
     await restoreExistingSessionName(ctx);
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    resetSessionState();
-    await restoreExistingSessionName(ctx);
-  });
-
   pi.on("before_agent_start", async (event, ctx) => {
     const firstPrompt = getFirstUserPrompt(ctx.sessionManager.getBranch()) ?? event.prompt;
 

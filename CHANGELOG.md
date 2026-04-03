@@ -23,6 +23,21 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.4.3] - 2026-04-03
+
+### Added
+
+- None.
+
+### Changed
+
+- Updated `@mariozechner/pi-ai` and `@mariozechner/pi-coding-agent` in peer and dev dependencies to `^0.65.0`.
+- Updated restore-flow docs to reflect pi 0.65.0 `session_start` handling.
+
+### Fixed
+
+- Removed the deprecated `session_switch` listener and now rely on `session_start` for pi 0.65.0 compatibility.
+
 ## [0.4.2] - 2026-03-27
 
 ### Added

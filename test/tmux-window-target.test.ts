@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { DISABLE_ENV_VAR, isTmuxWindowNameExtensionDisabled } from "../extensions/disable.ts";
+import tmuxWindowNameExtension from "../extensions/index.ts";
 import { buildRenameWindowArgs, resolveTmuxWindowTarget } from "../extensions/tmux-window-target.ts";
 
 test("buildRenameWindowArgs targets a captured window when available", () => {
@@ -53,5 +54,32 @@ test("isTmuxWindowNameExtensionDisabled accepts standard truthy env values", () 
 test("isTmuxWindowNameExtensionDisabled ignores empty and falsey-looking env values", () => {
   for (const value of [undefined, "", "0", "false", "no", "off", "disabled"]) {
     assert.equal(isTmuxWindowNameExtensionDisabled({ [DISABLE_ENV_VAR]: value }), false);
+  }
+});
+
+test("tmux extension uses session_start instead of deprecated session_switch", () => {
+  const previous = process.env[DISABLE_ENV_VAR];
+  delete process.env[DISABLE_ENV_VAR];
+
+  try {
+    const events: string[] = [];
+    const commands: string[] = [];
+
+    tmuxWindowNameExtension({
+      on(event: string) {
+        events.push(event);
+      },
+      registerCommand(name: string) {
+        commands.push(name);
+      },
+    } as any);
+
+    assert.equal(events.includes("session_start"), true);
+    assert.equal(events.includes("before_agent_start"), true);
+    assert.equal(events.includes("session_switch"), false);
+    assert.deepEqual(commands, ["rename"]);
+  } finally {
+    if (previous === undefined) delete process.env[DISABLE_ENV_VAR];
+    else process.env[DISABLE_ENV_VAR] = previous;
   }
 });

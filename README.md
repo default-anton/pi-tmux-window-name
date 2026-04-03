@@ -41,7 +41,7 @@ pi -e git:github.com/default-anton/pi-tmux-window-name
 - Names are generated once per session, then reused when switching/resuming sessions.
 - `/rename` takes no arguments and rebuilds the name from user and assistant message text in the current branch.
 - `/rename` ignores reasoning blocks, tool calls/results, and images.
-- On `session_start` / `session_switch`, tmux restore prefers the stored short title and falls back to a compacted session name.
+- On `session_start`, tmux restore prefers the stored short title and falls back to a compacted session name.
 - Name normalization strips punctuation and keeps alphanumeric words.
 - Set `PI_TMUX_WINDOW_NAME_DISABLED=1` to disable the extension completely, including tmux renames and the `/rename` command. This is useful for sub-agents.
 
