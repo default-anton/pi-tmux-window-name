@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.4.4] - 2026-04-21
+
+### Added
+
+- None.
+
+### Changed
+
+- Updated `@mariozechner/pi-ai` and `@mariozechner/pi-coding-agent` in peer and dev dependencies to `^0.68.0` for pi 0.68.0 compatibility.
+
+### Fixed
+
+- None.
+
 ## [0.4.3] - 2026-04-03
 
 ### Added
