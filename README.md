@@ -33,13 +33,14 @@ pi -e git:github.com/default-anton/pi-tmux-window-name
 - Persists the session name with `pi.setSessionName(...)`.
 - Persists the short tmux title in a custom session entry for reliable restore.
 - Renames the current tmux window (when running inside tmux).
-- Adds `/rename` to recompute names from the current branch conversation so far.
+- Adds `/rename` to recompute names from the current branch conversation so far, or accepts an explicit window name argument.
 - If generation fails or output is invalid, leaves session/tmux names unchanged.
 
 ## Extension behavior
 
 - Names are generated once per session, then reused when switching/resuming sessions.
-- `/rename` takes no arguments and rebuilds the name from user and assistant message text in the current branch.
+- `/rename` without arguments rebuilds the name from user and assistant message text in the current branch.
+- `/rename <window name>` uses the provided argument as the tmux window title and keeps the generated session-name flow for the session metadata.
 - `/rename` ignores reasoning blocks, tool calls/results, and images.
 - On `session_start`, tmux restore prefers the stored short title and falls back to a compacted session name.
 - Name normalization strips punctuation and keeps alphanumeric words.
