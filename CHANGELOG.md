@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.4.5] - 2026-04-22
+
+### Added
+
+- None.
+
+### Changed
+
+- Updated `@mariozechner/pi-ai` and `@mariozechner/pi-coding-agent` in peer and dev dependencies to `^0.69.0` for pi 0.69.0 compatibility and to drop the old transitive `@sinclair/typebox` lockfile path.
+
+### Fixed
+
+- None.
+
 ## [0.4.4] - 2026-04-21
 
 ### Added
