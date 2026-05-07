@@ -1,6 +1,6 @@
 {
   "name": "pi-tmux-window-name",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "Automatically name tmux windows for pi coding sessions",
   "type": "module",
   "keywords": [
@@ -38,12 +38,12 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@mariozechner/pi-ai": "^0.69.0",
-    "@mariozechner/pi-coding-agent": "^0.69.0"
+    "@earendil-works/pi-ai": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.74.0"
   },
   "devDependencies": {
-    "@mariozechner/pi-ai": "^0.69.0",
-    "@mariozechner/pi-coding-agent": "^0.69.0",
+    "@earendil-works/pi-ai": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
     "@types/node": "^25.0.10",
     "typescript": "^5.0.0"
   },

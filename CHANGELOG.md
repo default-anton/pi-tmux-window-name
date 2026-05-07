@@ -23,6 +23,20 @@ All notable changes to `pi-tmux-window-name` are documented here.
 
 - None.
 
+## [0.4.6] - 2026-05-07
+
+### Added
+
+- None.
+
+### Changed
+
+- Switched pi AI/coding-agent imports and dependencies to the `@earendil-works` scope at `^0.74.0`.
+
+### Fixed
+
+- None.
+
 ## [0.4.5] - 2026-04-22
 
 ### Added

@@ -1,10 +1,10 @@
-import { completeSimple, type UserMessage } from "@mariozechner/pi-ai";
+import { completeSimple, type UserMessage } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
   SessionEntry,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 import { isTmuxWindowNameExtensionDisabled } from "./disable.ts";
 import { buildRenameWindowArgs, resolveTmuxWindowTarget } from "./tmux-window-target.ts";
